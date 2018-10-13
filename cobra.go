@@ -2,7 +2,6 @@ package goose
 
 import (
 	"database/sql"
-	"fmt"
 
 	"github.com/spf13/cobra"
 )
@@ -14,7 +13,6 @@ func Command(dialect, dbUri string) *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			c := args[0]
-			fmt.Println(args)
 			if err := SetDialect(dialect); err != nil {
 				log.Fatal(err)
 			}
