@@ -4,9 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
 )
 
@@ -29,7 +26,7 @@ func (ms Migrations) Len() int      { return len(ms) }
 func (ms Migrations) Swap(i, j int) { ms[i], ms[j] = ms[j], ms[i] }
 func (ms Migrations) Less(i, j int) bool {
 	if ms[i].Version == ms[j].Version {
-		log.Fatalf("goose: duplicate version %v detected:\n%v\n%v", ms[i].Version, ms[i].Source, ms[j].Source)
+		log.Fatalf("goose: duplicate version %v detected:\n%v\n%v", ms[i].Version, ms[i].Name, ms[j].Name)
 	}
 	return ms[i].Version < ms[j].Version
 }
@@ -84,78 +81,32 @@ func (ms Migrations) String() string {
 	return str
 }
 
-// AddMigration adds a migration.
-func AddMigration(up func(*sql.Tx) error, down func(*sql.Tx) error) {
-	_, filename, _, _ := runtime.Caller(1)
-	AddNamedMigration(filename, up, down)
-}
-
-// AddNamedMigration : Add a named migration.
-func AddNamedMigration(filename string, up func(*sql.Tx) error, down func(*sql.Tx) error) {
-	v, _ := NumericComponent(filename)
-	migration := &Migration{Version: v, Next: -1, Previous: -1, Registered: true, UpFn: up, DownFn: down, Source: filename}
-
-	if existing, ok := registeredGoMigrations[v]; ok {
-		panic(fmt.Sprintf("failed to add migration %q: version conflicts with %q", filename, existing.Source))
+func AddMigration(version int64, name string, up func(*sql.Tx) error, down func(*sql.Tx) error) {
+	migration := &Migration{
+		Version:    version,
+		Next:       -1,
+		Previous:   -1,
+		Registered: true,
+		UpFn:       up,
+		DownFn:     down,
+		Name:       name,
 	}
 
-	registeredGoMigrations[v] = migration
+	if existing, ok := registeredGoMigrations[version]; ok {
+		panic(fmt.Sprintf("failed to add migration %q: version conflicts with %q", name, existing.Name))
+	}
+
+	registeredGoMigrations[version] = migration
 }
 
 // CollectMigrations returns all the valid looking migration scripts in the
 // migrations folder and go func registry, and key them by version.
-func CollectMigrations(dirpath string, current, target int64) (Migrations, error) {
-	if _, err := os.Stat(dirpath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("%s directory does not exists", dirpath)
-	}
-
+func CollectMigrations(current, target int64) (Migrations, error) {
 	var migrations Migrations
-
-	// SQL migration files.
-	sqlMigrationFiles, err := filepath.Glob(dirpath + "/**.sql")
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range sqlMigrationFiles {
-		v, err := NumericComponent(file)
-		if err != nil {
-			return nil, err
-		}
-		if versionFilter(v, current, target) {
-			migration := &Migration{Version: v, Next: -1, Previous: -1, Source: file}
-			migrations = append(migrations, migration)
-		}
-	}
 
 	// Go migrations registered via goose.AddMigration().
 	for _, migration := range registeredGoMigrations {
-		v, err := NumericComponent(migration.Source)
-		if err != nil {
-			return nil, err
-		}
-		if versionFilter(v, current, target) {
-			migrations = append(migrations, migration)
-		}
-	}
-
-	// Go migration files
-	goMigrationFiles, err := filepath.Glob(dirpath + "/**.go")
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range goMigrationFiles {
-		v, err := NumericComponent(file)
-		if err != nil {
-			continue // Skip any files that don't have version prefix.
-		}
-
-		// Skip migrations already existing migrations registered via goose.AddMigration().
-		if _, ok := registeredGoMigrations[v]; ok {
-			continue
-		}
-
-		if versionFilter(v, current, target) {
-			migration := &Migration{Version: v, Next: -1, Previous: -1, Source: file, Registered: false}
+		if versionFilter(migration.Version, current, target) {
 			migrations = append(migrations, migration)
 		}
 	}

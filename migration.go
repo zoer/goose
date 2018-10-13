@@ -20,16 +20,16 @@ type MigrationRecord struct {
 // Migration struct.
 type Migration struct {
 	Version    int64
-	Next       int64  // next version, or -1 if none
-	Previous   int64  // previous version, -1 if none
-	Source     string // path to .sql script
+	Next       int64 // next version, or -1 if none
+	Previous   int64 // previous version, -1 if none
+	Name       string
 	Registered bool
 	UpFn       func(*sql.Tx) error // Up go migration function
 	DownFn     func(*sql.Tx) error // Down go migration function
 }
 
 func (m *Migration) String() string {
-	return fmt.Sprintf(m.Source)
+	return fmt.Sprintf("%d_%s", m.Version, m.Name)
 }
 
 // Up runs an up migration.
@@ -37,7 +37,7 @@ func (m *Migration) Up(db *sql.DB) error {
 	if err := m.run(db, true); err != nil {
 		return err
 	}
-	log.Println("OK   ", filepath.Base(m.Source))
+	log.Println("OK   ", m.String())
 	return nil
 }
 
@@ -46,46 +46,36 @@ func (m *Migration) Down(db *sql.DB) error {
 	if err := m.run(db, false); err != nil {
 		return err
 	}
-	log.Println("OK   ", filepath.Base(m.Source))
+	log.Println("OK   ", m.String())
 	return nil
 }
 
 func (m *Migration) run(db *sql.DB, direction bool) error {
-	switch filepath.Ext(m.Source) {
-	case ".sql":
-		if err := runSQLMigration(db, m.Source, m.Version, direction); err != nil {
-			return fmt.Errorf("FAIL %v, quitting migration", err)
-		}
-
-	case ".go":
-		if !m.Registered {
-			log.Fatalf("failed to apply Go migration %q: Go functions must be registered and built into a custom binary (see https://github.com/pressly/goose/tree/master/examples/go-migrations)", m.Source)
-		}
-		tx, err := db.Begin()
-		if err != nil {
-			log.Fatal("db.Begin: ", err)
-		}
-
-		fn := m.UpFn
-		if !direction {
-			fn = m.DownFn
-		}
-		if fn != nil {
-			if err := fn(tx); err != nil {
-				tx.Rollback()
-				log.Fatalf("FAIL %s (%v), quitting migration.", filepath.Base(m.Source), err)
-				return err
-			}
-		}
-		if _, err := tx.Exec(GetDialect().insertVersionSQL(), m.Version, direction); err != nil {
-			tx.Rollback()
-			return err
-		}
-
-		return tx.Commit()
+	if !m.Registered {
+		log.Fatalf("failed to apply migration %q: functions must be registered and built into a custom binary ", m)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal("db.Begin: ", err)
 	}
 
-	return nil
+	fn := m.UpFn
+	if !direction {
+		fn = m.DownFn
+	}
+	if fn != nil {
+		if err := fn(tx); err != nil {
+			tx.Rollback()
+			log.Fatalf("FAIL %s (%v), quitting migration.", m, err)
+			return err
+		}
+	}
+	if _, err := tx.Exec(GetDialect().insertVersionSQL(), m.Version, direction); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // NumericComponent looks for migration scripts with names in the form:
