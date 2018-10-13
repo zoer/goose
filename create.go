@@ -53,7 +53,7 @@ func writeTemplateToFile(path, name, version string) (string, error) {
 	return f.Name(), nil
 }
 
-var tmplMigration = template.Must(template.New("goose.go-migration").Parse(`package migration
+var tmplMigration = template.Must(template.New("goose.go-migration").Parse(`package migrations
 
 import (
 	"database/sql"
