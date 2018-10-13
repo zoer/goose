@@ -5,8 +5,8 @@ import (
 )
 
 // UpTo migrates up to a specific version.
-func UpTo(db *sql.DB, dir string, version int64) error {
-	migrations, err := CollectMigrations(dir, minVersion, version)
+func UpTo(db *sql.DB, version int64) error {
+	migrations, err := CollectMigrations(minVersion, version)
 	if err != nil {
 		return err
 	}
@@ -20,7 +20,7 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 		next, err := migrations.Next(current)
 		if err != nil {
 			if err == ErrNoNextVersion {
-				log.Printf("goose: no migrations to run. current version: %d\n", current)
+				log.Printf("no migrations to run. current version: %d\n", current)
 				return nil
 			}
 			return err
@@ -34,12 +34,12 @@ func UpTo(db *sql.DB, dir string, version int64) error {
 
 // Up applies all available migrations.
 func Up(db *sql.DB, dir string) error {
-	return UpTo(db, dir, maxVersion)
+	return UpTo(db, maxVersion)
 }
 
 // UpByOne migrates up by a single version.
 func UpByOne(db *sql.DB, dir string) error {
-	migrations, err := CollectMigrations(dir, minVersion, maxVersion)
+	migrations, err := CollectMigrations(minVersion, maxVersion)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func UpByOne(db *sql.DB, dir string) error {
 	next, err := migrations.Next(currentVersion)
 	if err != nil {
 		if err == ErrNoNextVersion {
-			log.Printf("goose: no migrations to run. current version: %d\n", currentVersion)
+			log.Printf("no migrations to run. current version: %d\n", currentVersion)
 		}
 		return err
 	}

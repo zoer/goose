@@ -6,50 +6,32 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 )
 
 // Create writes a new blank migration file.
-func CreateWithTemplate(db *sql.DB, dir string, migrationTemplate *template.Template, name, migrationType string) error {
-	migrations, err := CollectMigrations(dir, minVersion, maxVersion)
-	if err != nil {
-		return err
-	}
+func CreateWithTemplate(db *sql.DB, dir string, name string) error {
+	version := time.Now().Format("20060102150405")
 
-	// Initial version.
-	version := "00001"
-
-	if last, err := migrations.Last(); err == nil {
-		version = fmt.Sprintf("%05v", last.Version+1)
-	}
-
-	filename := fmt.Sprintf("%v_%v.%v", version, name, migrationType)
-
+	filename := fmt.Sprintf("%v_%v.go", version, name)
 	fpath := filepath.Join(dir, filename)
 
-	tmpl := sqlMigrationTemplate
-	if migrationType == "go" {
-		tmpl = goSQLMigrationTemplate
-	}
-
-	if migrationTemplate != nil {
-		tmpl = migrationTemplate
-	}
-
-	path, err := writeTemplateToFile(fpath, tmpl, version)
+	path, err := writeTemplateToFile(fpath, name, version)
 	if err != nil {
 		return err
 	}
 
 	log.Printf("Created new file: %s\n", path)
+
 	return nil
 }
 
 // Create writes a new blank migration file.
-func Create(db *sql.DB, dir, name, migrationType string) error {
-	return CreateWithTemplate(db, dir, nil, name, migrationType)
+func Create(db *sql.DB, dir, name string) error {
+	return CreateWithTemplate(db, dir, name)
 }
 
-func writeTemplateToFile(path string, t *template.Template, version string) (string, error) {
+func writeTemplateToFile(path, name, version string) (string, error) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		return "", fmt.Errorf("failed to create file: %v already exists", path)
 	}
@@ -60,7 +42,10 @@ func writeTemplateToFile(path string, t *template.Template, version string) (str
 	}
 	defer f.Close()
 
-	err = t.Execute(f, version)
+	err = tmplMigration.Execute(f, map[string]interface{}{
+		"version": version,
+		"name":    name,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -68,31 +53,28 @@ func writeTemplateToFile(path string, t *template.Template, version string) (str
 	return f.Name(), nil
 }
 
-var sqlMigrationTemplate = template.Must(template.New("goose.sql-migration").Parse(`-- +goose Up
--- SQL in this section is executed when the migration is applied.
-
--- +goose Down
--- SQL in this section is executed when the migration is rolled back.
-`))
-
-var goSQLMigrationTemplate = template.Must(template.New("goose.go-migration").Parse(`package migration
+var tmplMigration = template.Must(template.New("goose.go-migration").Parse(`package migration
 
 import (
 	"database/sql"
-	"github.com/pressly/goose"
+	"github.com/zoer/goose"
 )
 
+const sqlUp{{.version}} = ` + "`\nSELECT 1;\n`" + `
+
+const sqlDown{{.version}} = ` + "`\nSELECT 1;\n`" + `
+
 func init() {
-	goose.AddMigration(Up{{.}}, Down{{.}})
+	goose.AddMigration({{.version}}, "{{.name}}" Up{{.version}}, Down{{.version}})
 }
 
-func Up{{.}}(tx *sql.Tx) error {
-	// This code is executed when the migration is applied.
-	return nil
+func Up{{.version}}(tx *sql.Tx) error {
+	_, err := tx.Exec(sqlUp{{.version}})
+	return err
 }
 
-func Down{{.}}(tx *sql.Tx) error {
-	// This code is executed when the migration is rolled back.
-	return nil
+func Down{{.version}}(tx *sql.Tx) error {
+	_, err := tx.Exec(sqlDown{{.version}})
+	return err
 }
 `))

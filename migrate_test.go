@@ -5,7 +5,7 @@ import (
 )
 
 func newMigration(v int64, src string) *Migration {
-	return &Migration{Version: v, Previous: -1, Next: -1, Source: src}
+	return &Migration{Version: v, Previous: -1, Next: -1, Name: src}
 }
 
 func TestMigrationSort(t *testing.T) {

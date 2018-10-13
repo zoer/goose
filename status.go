@@ -3,14 +3,13 @@ package goose
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"time"
 )
 
 // Status prints the status of all migrations.
-func Status(db *sql.DB, dir string) error {
+func Status(db *sql.DB) error {
 	// collect all migrations
-	migrations, err := CollectMigrations(dir, minVersion, maxVersion)
+	migrations, err := CollectMigrations(minVersion, maxVersion)
 	if err != nil {
 		return err
 	}
@@ -23,7 +22,7 @@ func Status(db *sql.DB, dir string) error {
 	log.Println("    Applied At                  Migration")
 	log.Println("    =======================================")
 	for _, migration := range migrations {
-		printMigrationStatus(db, migration.Version, filepath.Base(migration.Source))
+		printMigrationStatus(db, migration.Version, migration.Name)
 	}
 
 	return nil
