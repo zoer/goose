@@ -65,7 +65,7 @@ const sqlUp{{.version}} = ` + "``" + `
 const sqlDown{{.version}} = ` + "``" + `
 
 func init() {
-	goose.AddMigration({{.version}}, "{{.name}}" Up{{.version}}, Down{{.version}})
+	goose.AddMigration({{.version}}, "{{.name}}", Up{{.version}}, Down{{.version}})
 }
 
 func Up{{.version}}(tx *sql.Tx) error {
