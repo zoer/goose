@@ -60,9 +60,9 @@ import (
 	"github.com/zoer/goose"
 )
 
-const sqlUp{{.version}} = ` + "`\nSELECT 1;\n`" + `
+const sqlUp{{.version}} = ` + "``" + `
 
-const sqlDown{{.version}} = ` + "`\nSELECT 1;\n`" + `
+const sqlDown{{.version}} = ` + "``" + `
 
 func init() {
 	goose.AddMigration({{.version}}, "{{.name}}" Up{{.version}}, Down{{.version}})
