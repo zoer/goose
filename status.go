@@ -45,5 +45,5 @@ func printMigrationStatus(db *sql.DB, version int64, script string) {
 		appliedAt = "Pending"
 	}
 
-	log.Printf("    %-24s -- %v\n", appliedAt, script)
+	log.Printf("    %-24s -- %d_%v\n", appliedAt, version, script)
 }
